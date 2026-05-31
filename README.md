@@ -6,7 +6,7 @@
 
 <p align="center"><img src="assets/banner.png" alt="FH6 Universal Radio" /></p>
 
-An open-source radio mod for **Forza Horizon 6**. Adds a new in-game radio station fed from your **local music**, **Spotify**, **YouTube Music**, **Jellyfin** server, or **any Windows app** (Deezer, a browser tab...), controlled from a browser dashboard.
+An open-source radio mod for **Forza Horizon 6**. Adds a new in-game radio station fed from your **local music**, **Spotify**, **YouTube Music**, **Jellyfin** server, **Plex** server, or **any Windows app** (Deezer, a browser tab...), controlled from a browser dashboard.
 
 <p align="center">
   <img src="assets/ingame.png" alt="In-game radio station" width="49%" />
@@ -20,6 +20,7 @@ An open-source radio mod for **Forza Horizon 6**. Adds a new in-game radio stati
 - **Spotify Connect**: cast from the Spotify app to an "FH6 Universal Radio" device (requires Spotify Premium).
 - **Jellyfin**: stream playlists from your own Jellyfin server.
 - **External audio**: capture any Windows app (Deezer, a browser tab...) and pipe it into the radio through a virtual audio cable; metadata and next/previous come from the Windows media session.
+- **Plex**: stream music playlists from your own Plex server.
 - **In-game radio integration**: audio is routed through FH6's radio bus, fades with menus and reacts to in-game volume like every other station.
 - **Live dashboard** at `http://localhost:8420`: switch source, transport controls, volume, settings.
 - **Race start action**: on race begin, advance to next track, restart the current one, or leave it alone.
@@ -109,7 +110,8 @@ Requires **CMake** and **llvm-mingw** (the Clang-based MinGW-w64 toolchain, sinc
 | `[local] failed to open ... .m4a` (or `.opus`, `.aac`, ...) | The built-in decoder handles MP3/FLAC/WAV/OGG only; other formats are routed through `ffmpeg`. Install it (`winget install Gyan.FFmpeg`) and either put it on `PATH` or set the path under **Settings > General > ffmpeg path**. |
 | YouTube Music produces no audio | Check `%TEMP%\fh6-stderr.log` (helper-process stderr lands there). Usually missing yt-dlp/ffmpeg, expired cookies, or geo/format restrictions. |
 | Spotify device doesn't appear or won't play | Wait for `librespot` to finish downloading, confirm your phone/PC is on the same network, and that the account is Spotify Premium. Helper stderr lands in `%TEMP%\fh6-spotify-stderr.log`. |
-| Jellyfin cast returns "fetch failed" (502) | Check server URL, API key, and user ID under **Settings > Jellyfin**, that the playlist ID exists, and that the server is reachable from this machine. Jellyfin transcodes to PCM via `ffmpeg. |
+| Jellyfin cast returns "fetch failed" (502) | Check server URL, API key, and user ID under **Settings > Jellyfin**, that the playlist ID exists, and that the server is reachable from this machine. Jellyfin transcodes to PCM via `ffmpeg`, so the configured ffmpeg path must be valid. |
+| Plex cast returns "fetch failed" (502) | Check server URL and token under **Settings > Plex**, that the playlist ratingKey exists, and that the server is reachable from this machine. Plex playback streams through `ffmpeg`, so the configured ffmpeg path must be valid. |
 | External Audio plays in the background, not through the radio | You're capturing the same device the app plays on. Route the app's output to a **virtual audio cable** and select that cable as the **Capture device** (see [External audio](#external-audio)). |
 | External Audio has clicks / artifacts | Set the virtual cable to **48000 Hz** (2 ch). Other sample rates caused artifacts in testing. |
 
@@ -131,4 +133,4 @@ Released under the [GNU General Public License v3.0](LICENSE). You're free to us
 
 ## Disclaimer
 
-Unofficial fan-made mod. Not affiliated with, endorsed by, or connected to Turn 10 Studios, Playground Games, Xbox Game Studios, Microsoft, Google, YouTube, Jellyfin (Jellyfin LLC), or Spotify (Spotify AB). All trademarks belong to their respective owners. Use at your own risk.
+Unofficial fan-made mod. Not affiliated with, endorsed by, or connected to Turn 10 Studios, Playground Games, Xbox Game Studios, Microsoft, Google, YouTube, Jellyfin (Jellyfin LLC), Plex, or Spotify (Spotify AB). All trademarks belong to their respective owners. Use at your own risk.
