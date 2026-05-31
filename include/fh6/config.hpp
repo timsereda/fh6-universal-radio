@@ -83,6 +83,14 @@ struct OnlineRadioConfig {
     size_t default_station_index = 0;
 };
 
+struct PlexConfig {
+    bool enabled = false;
+    std::string server_url;
+    std::string token;
+    std::string default_playlist;
+    bool shuffle = true;
+};
+
 struct AudioConfig {
     float output_gain = 1.0f;
 };
@@ -112,6 +120,7 @@ struct Config {
     YouTubeMusicConfig youtube_music;
     AudioConfig audio;
     JellyfinConfig jellyfin;
+    PlexConfig plex;
     ExternalAudioConfig external_audio;
     SpotifyConfig spotify;
     OnlineRadioConfig online_radio;

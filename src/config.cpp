@@ -156,6 +156,13 @@ Config load_config(const std::filesystem::path& path) {
         cfg.online_radio.stations.push_back(std::move(rs));
     }
 
+    const auto& px = section(root, "plex");
+    cfg.plex.enabled = pick<bool>(px, "enabled", cfg.plex.enabled);
+    cfg.plex.server_url = pick<std::string>(px, "server_url", cfg.plex.server_url);
+    cfg.plex.token = pick<std::string>(px, "token", cfg.plex.token);
+    cfg.plex.default_playlist = pick<std::string>(px, "default_playlist", cfg.plex.default_playlist);
+    cfg.plex.shuffle = pick<bool>(px, "shuffle", cfg.plex.shuffle);
+
     const auto& ea             = section(root, "external_audio");
     cfg.external_audio.enabled = pick<bool>(ea, "enabled", cfg.external_audio.enabled);
     cfg.external_audio.endpoint_id =
@@ -340,6 +347,13 @@ void save_config(const std::filesystem::path& path, const Config& cfg) {
     e.kv("default_playlist", cfg.jellyfin.default_playlist);
     e.kv("use_favorites", cfg.jellyfin.use_favorites);
     e.kv("shuffle", cfg.jellyfin.shuffle);
+
+    e.header("plex");
+    e.kv("enabled", cfg.plex.enabled);
+    e.kv("server_url", cfg.plex.server_url);
+    e.kv("token", cfg.plex.token);
+    e.kv("default_playlist", cfg.plex.default_playlist);
+    e.kv("shuffle", cfg.plex.shuffle);
 
     e.header("external_audio");
     e.kv("enabled", cfg.external_audio.enabled);

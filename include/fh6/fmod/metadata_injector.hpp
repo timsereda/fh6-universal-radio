@@ -34,6 +34,11 @@ public:
     // successful write. Returns true on a successful write (or no-op).
     bool update(std::string_view title, std::string_view artist) noexcept;
 
+    // Uncached write for additional SampleProperties bodies that may be used
+    // by HUD/ambient radio paths separate from the active FMOD channel.
+    static bool update_body(std::byte* sample_props_body, std::string_view title,
+                            std::string_view artist) noexcept;
+
 private:
     std::byte* body_ = nullptr;
     std::string last_title_;

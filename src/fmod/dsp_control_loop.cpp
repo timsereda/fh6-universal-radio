@@ -318,6 +318,12 @@ void ControlLoop::push_metadata() noexcept {
         }
     }
     meta_.update(title, artist);
+
+    auto disc = discover_radio_instances(img_);
+    for (auto& inst : disc.instances) {
+        if (inst.sound_name == kTargetSoundName)
+            MetadataInjector::update_body(inst.sample_props_body, title, artist);
+    }
 }
 
 } // namespace fh6::fmod_bridge
