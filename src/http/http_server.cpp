@@ -7,6 +7,7 @@
 #include "fh6/sources/local_file_source.hpp"
 #include "fh6/sources/youtube_music_source.hpp"
 #include "fh6/sources/jellyfin_source.hpp"
+#include "fh6/sources/plex_source.hpp"
 #include "fh6/sources/external_audio_source.hpp"
 #include "fh6/sources/external_media_session.hpp"
 #include "fh6/sources/spotify_source.hpp"
@@ -100,6 +101,8 @@ json source_to_json(IAudioSource* s) {
         j["details"]["track_count"] = lf->track_count();
     if (auto* yt = dynamic_cast<sources::YouTubeMusicSource*>(s))
         j["details"]["shuffle"] = yt->shuffle();
+    if (auto* plex = dynamic_cast<sources::PlexSource*>(s))
+        j["details"]["shuffle"] = plex->shuffle();
     return j;
 }
 
@@ -138,6 +141,14 @@ json config_to_json(const Config& c) {
              {"default_playlist", c.jellyfin.default_playlist},
              {"use_favorites", c.jellyfin.use_favorites},
              {"shuffle", c.jellyfin.shuffle},
+         }},
+        {"plex",
+         json{
+             {"enabled", c.plex.enabled},
+             {"server_url", c.plex.server_url},
+             {"token", c.plex.token},
+             {"default_playlist", c.plex.default_playlist},
+             {"shuffle", c.plex.shuffle},
          }},
         {"external_audio",
          json{
@@ -213,6 +224,13 @@ void apply_patch(Config& c, const json& j) {
         c.jellyfin.default_playlist = pull(*it, "default_playlist", c.jellyfin.default_playlist);
         c.jellyfin.use_favorites    = pull(*it, "use_favorites", c.jellyfin.use_favorites);
         c.jellyfin.shuffle          = pull(*it, "shuffle", c.jellyfin.shuffle);
+    }
+    if (auto it = j.find("plex"); it != j.end()) {
+        c.plex.enabled          = pull(*it, "enabled", c.plex.enabled);
+        c.plex.server_url       = pull(*it, "server_url", c.plex.server_url);
+        c.plex.token            = pull(*it, "token", c.plex.token);
+        c.plex.default_playlist = pull(*it, "default_playlist", c.plex.default_playlist);
+        c.plex.shuffle          = pull(*it, "shuffle", c.plex.shuffle);
     }
     if (auto it = j.find("external_audio"); it != j.end()) {
         c.external_audio.enabled = pull(*it, "enabled", c.external_audio.enabled);
@@ -638,6 +656,17 @@ struct HttpServer::Impl {
             if (!jf->cast(std::move(playlist_id))) return fail(502, "jellyfin fetch failed");
             if (was_active) mgr.ring().drain();
             mgr.switch_to("jellyfin");
+            return ok();
+        }
+        if (m == "POST" && p == "/api/source/plex/cast") {
+            auto* plex = find_typed<sources::PlexSource>("plex");
+            if (!plex) return fail(404, "plex not registered");
+            auto playlist_id = json::parse(req.body).value("playlist_id", std::string{});
+            if (playlist_id.empty()) return fail(400, "playlist_id required");
+            const bool was_active = (mgr.active() == plex);
+            if (!plex->cast(std::move(playlist_id))) return fail(502, "plex fetch failed");
+            if (was_active) mgr.ring().drain();
+            mgr.switch_to("plex");
             return ok();
         }
         if (m == "POST" && p == "/api/source/local_files/rescan") {

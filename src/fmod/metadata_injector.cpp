@@ -143,4 +143,11 @@ bool MetadataInjector::update(std::string_view title, std::string_view artist) n
     return ok;
 }
 
+bool MetadataInjector::update_body(std::byte* sample_props_body, std::string_view title,
+                                   std::string_view artist) noexcept {
+    if (!sample_props_body) return false;
+    return write_string_slot(sample_props_body + kTitleOffset, title) &&
+           write_string_slot(sample_props_body + kArtistOffset, artist);
+}
+
 } // namespace fh6::fmod_bridge

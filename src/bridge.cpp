@@ -14,6 +14,7 @@
 #include "fh6/sources/external_audio_source.hpp"
 #include "fh6/sources/youtube_music_source.hpp"
 #include "fh6/sources/jellyfin_source.hpp"
+#include "fh6/sources/plex_source.hpp"
 #include "fh6/sources/spotify_source.hpp"
 
 #include <windows.h>
@@ -147,6 +148,12 @@ void run_bridge(HMODULE self) noexcept {
         } else if (!c.jellyfin.enabled && mgr.find("jellyfin")) {
             mgr.unregister_source("jellyfin");
         }
+        if (c.plex.enabled && !mgr.find("plex")) {
+            auto src = std::make_unique<sources::PlexSource>(c.plex, c.general.ffmpeg_path);
+            if (src->initialize()) mgr.register_source(std::move(src));
+        } else if (!c.plex.enabled && mgr.find("plex")) {
+            mgr.unregister_source("plex");
+        }
 
         if (c.external_audio.enabled && !mgr.find("external_audio")) {
             auto src = std::make_unique<sources::ExternalAudioSource>(c.external_audio);
@@ -210,6 +217,10 @@ void run_bridge(HMODULE self) noexcept {
         if (auto* jf = dynamic_cast<sources::JellyfinSource*>(mgr.find("jellyfin"))) {
             jf->set_ffmpeg_path(c.general.ffmpeg_path);
             jf->set_config(c.jellyfin);
+        }
+        if (auto* plex = dynamic_cast<sources::PlexSource*>(mgr.find("plex"))) {
+            plex->set_ffmpeg_path(c.general.ffmpeg_path);
+            plex->set_config(c.plex);
         }
         if (auto* ext = dynamic_cast<sources::ExternalAudioSource*>(mgr.find("external_audio"))) {
             ext->set_config(c.external_audio);

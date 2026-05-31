@@ -26,6 +26,8 @@ namespace fh6::http {
 //   POST /api/source/<name>/{play,pause,stop,next,previous}
 //
 //   POST /api/source/youtube_music/cast   body {"url":"..."}
+//   POST /api/source/jellyfin/cast        body {"playlist_id":"..."}
+//   POST /api/source/plex/cast            body {"playlist_id":"..."}
 //   POST /api/source/local_files/rescan   body {"music_dir":"...","recursive":bool}
 //   GET  /api/source/local_files/playlist
 //
