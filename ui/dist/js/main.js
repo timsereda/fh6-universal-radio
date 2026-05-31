@@ -10,6 +10,7 @@ import { createOutput } from "./render/output.js";
 import { renderSettings, collectSettings } from "./render/settings.js";
 import { createDeps } from "./render/deps.js";
 import { createExternalAudio } from "./render/externalAudio.js";
+import { createPlex } from "./render/plex.js";
 
 let state = null;
 let cfg = null;
@@ -32,7 +33,16 @@ const refs = {
   outputCard: $("#output-card"),
   ytCard: $("#yt-cast-card"),
   jfCard: $("#jf-cast-card"),
+  plexCard: $("#plex-cast-card"),
   ytShuffle: $("#yt-shuffle"),
+  plex: {
+    card: $("#plex-cast-card"),
+    select: $("#plex-playlists"),
+    scan: $("#plex-scan"),
+    hint: $("#plex-scan-hint"),
+    form: $("#plex-cast"),
+    input: $("#plex-url"),
+  },
   drawer: $("#drawer"),
   scrim: $("#scrim"),
   form: $("#settings-form"),
@@ -65,6 +75,10 @@ const externalAudio = createExternalAudio(mainEl, {
     state = await api.getState().catch(() => state);
     render();
   },
+});
+
+const plex = createPlex(refs.plex, {
+  getState: () => state,
 });
 
 async function switchSource(name) {
@@ -118,6 +132,7 @@ function render() {
   renderSources(refs.sources, state, cfg, switchSource);
   renderOutput(state);
   externalAudio.render();
+  plex.render();
 
   refs.sourceCard.hidden = false;
   refs.outputCard.hidden = !state.sources?.active;
@@ -193,6 +208,7 @@ $("#save-config").addEventListener("click", async () => {
   try {
     cfg = await api.putConfig(collectSettings(refs.form));
     externalAudio.invalidate();
+    plex.invalidate();
     state = await api.getState().catch(() => state);
     render();
     toast("Saved");
@@ -206,6 +222,7 @@ $("#reload-config").addEventListener("click", async () => {
   try {
     cfg = await api.reloadConfig();
     externalAudio.invalidate();
+    plex.invalidate();
     renderSettings(refs.form, cfg);
     render();
     toast("Reloaded from disk");

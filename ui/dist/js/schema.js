@@ -47,6 +47,17 @@ export const SCHEMA = [
       ["shuffle", "Shuffle", "checkbox"],
     ],
   ],
+  [
+    "plex",
+    "Plex",
+    [
+      ["enabled", "Enabled", "checkbox"],
+      ["server_url", "Server URL", "text"],
+      ["token", "Token", "text"],
+      ["default_playlist", "Default Playlist ratingKey", "text"],
+      ["shuffle", "Shuffle", "checkbox"],
+    ],
+  ],
   ["external_audio", "External Audio", [["enabled", "Enabled", "checkbox"]]],
   [
     "spotify",
