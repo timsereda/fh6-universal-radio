@@ -4,8 +4,8 @@ FH6 Universal Radio
 Thanks for grabbing this. It's a free, open-source mod that drops a
 brand new station into Forza Horizon 6's radio dial. You feed it audio
 from a folder of music files on your PC, from online radio stations, from
-Spotify, from any YouTube / YouTube Music link, from a Jellyfin server, or
-from any other Windows app (Deezer, a browser tab...), and the game treats the result
+Spotify, from any YouTube / YouTube Music link, from a Jellyfin or Plex
+server, or from any other Windows app (Deezer, a browser tab...), and the game treats the result
 like every other station: it ducks for menus, follows your in-game
 volume slider, and fades on the loading screen.
 
@@ -78,6 +78,11 @@ From there:
     Configure the server URL, API key, user ID, and playlist ID
     under Settings > Jellyfin.
 
+  * Plex: stream music playlists from your own Plex server.
+    Configure the server URL, token, and playlist ratingKey under
+    Settings > Plex. Plex playback routes through ffmpeg, so the
+    configured ffmpeg path must be valid.
+
   * External audio: capture any Windows playback device and pipe a
     live app (Deezer, a browser tab...) into the radio. The capture
     is a loopback of whatever the device plays, so route the app to a
@@ -122,5 +127,6 @@ the README on the repo has GitHub Sponsors and Ko-fi links.
 Unofficial fan project. Nothing here is affiliated with, endorsed by,
 or connected to Turn 10 Studios, Playground Games, Xbox Game Studios,
 Microsoft, Google, YouTube, or Jellyfin (Jellyfin LLC). Forza Horizon,
-Forza Motorsport, and all other names dropped above belong to their
-respective owners. Provided as-is, no warranty, use at your own risk.
+Plex, Forza Motorsport, and all other names dropped above belong to
+their respective owners. Provided as-is, no warranty, use at your own
+risk.
