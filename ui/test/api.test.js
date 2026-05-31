@@ -63,6 +63,20 @@ describe("api endpoints", () => {
       path: "/api/source/jellyfin/cast",
       body: { playlist_id: "pl-1" },
     });
+
+    await api.castPlex("42");
+    expect(lastCall()).toMatchObject({
+      path: "/api/source/plex/cast",
+      body: { playlist_id: "42" },
+    });
+  });
+
+  it("loads Plex playlists", async () => {
+    await api.getPlexPlaylists();
+    expect(lastCall()).toMatchObject({
+      path: "/api/source/plex/playlists",
+      method: "GET",
+    });
   });
 
   it("castOnlineRadio carries url plus optional name/logo", async () => {

@@ -12,6 +12,7 @@ import { createDeps } from "./render/deps.js";
 import { createExternalAudio } from "./render/externalAudio.js";
 import { createLocalFiles } from "./render/localFiles.js";
 import { createOnlineRadio } from "./render/onlineRadio.js";
+import { createPlex } from "./render/plex.js";
 
 let state = null;
 let cfg = null;
@@ -34,7 +35,16 @@ const refs = {
   outputCard: $("#output-card"),
   ytCard: $("#yt-cast-card"),
   jfCard: $("#jf-cast-card"),
+  plexCard: $("#plex-cast-card"),
   ytShuffle: $("#yt-shuffle"),
+  plex: {
+    card: $("#plex-cast-card"),
+    select: $("#plex-playlists"),
+    scan: $("#plex-scan"),
+    hint: $("#plex-scan-hint"),
+    form: $("#plex-cast"),
+    input: $("#plex-url"),
+  },
   drawer: $("#drawer"),
   scrim: $("#scrim"),
   form: $("#settings-form"),
@@ -87,6 +97,10 @@ const onlineRadio = createOnlineRadio(mainEl, {
     state = await api.getState().catch(() => state);
     render();
   },
+});
+
+const plex = createPlex(refs.plex, {
+  getState: () => state,
 });
 
 async function switchSource(name) {
@@ -142,6 +156,7 @@ function render() {
   externalAudio.render();
   localFiles.render();
   onlineRadio.render();
+  plex.render();
 
   refs.sourceCard.hidden = false;
   refs.outputCard.hidden = !state.sources?.active;
@@ -221,6 +236,7 @@ $("#save-config").addEventListener("click", async () => {
     externalAudio.invalidate();
     localFiles.invalidate();
     onlineRadio.invalidate();
+    plex.invalidate();
     state = await api.getState().catch(() => state);
     render();
     toast("Saved");
@@ -236,6 +252,7 @@ $("#reload-config").addEventListener("click", async () => {
     externalAudio.invalidate();
     localFiles.invalidate();
     onlineRadio.invalidate();
+    plex.invalidate();
     renderSettings(refs.form, cfg);
     render();
     toast("Reloaded from disk");

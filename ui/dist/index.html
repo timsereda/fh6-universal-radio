@@ -71,6 +71,24 @@
         </form>
       </section>
 
+      <section class="card" id="plex-cast-card" hidden>
+        <h2>Play Plex Playlist</h2>
+        <p class="muted">
+          Scan Plex playlists from the configured server, or enter a playlist ratingKey manually.
+        </p>
+        <div class="plex-scan-row">
+          <select id="plex-playlists" aria-label="Plex playlists">
+            <option value="">Scan playlists to choose one</option>
+          </select>
+          <button type="button" class="btn ghost" id="plex-scan">Scan</button>
+        </div>
+        <p class="muted" id="plex-scan-hint"></p>
+        <form id="plex-cast" class="row">
+          <input type="text" id="plex-url" placeholder="Playlist ratingKey" autocomplete="off" />
+          <button type="submit" class="btn filled">Play</button>
+        </form>
+      </section>
+
       <section class="card" id="output-card" hidden>
         <h2>Output</h2>
         <label class="slider">

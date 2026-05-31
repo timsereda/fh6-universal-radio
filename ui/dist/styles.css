@@ -610,6 +610,13 @@ main {
   gap: var(--spacing-8);
 }
 
+.plex-scan-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  margin-bottom: var(--spacing-8);
+}
+
 input[type="text"],
 input[type="number"],
 select {

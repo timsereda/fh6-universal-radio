@@ -25,6 +25,9 @@ export const api = {
     request("/api/source/youtube_music/shuffle", { method: "POST", body: { shuffle } }),
   castJellyfin: playlistId =>
     request("/api/source/jellyfin/cast", { method: "POST", body: { playlist_id: playlistId } }),
+  getPlexPlaylists: () => request("/api/source/plex/playlists"),
+  castPlex: playlistId =>
+    request("/api/source/plex/cast", { method: "POST", body: { playlist_id: playlistId } }),
   setGain: gain => request("/api/options", { method: "POST", body: { output_gain: gain } }),
   getExternalAudio: () => request("/api/external_audio/devices"),
   putExternalAudio: config => request("/api/external_audio/config", { method: "PUT", body: config }),
