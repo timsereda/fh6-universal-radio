@@ -40,7 +40,7 @@ shuffle            = true              # true or false
 enabled            = false
 server_url         = ''                # e.g. 'http://127.0.0.1:32400'
 token              = ''                # your Plex X-Plex-Token
-default_playlist   = ''                # Plex playlist ratingKey goes here
+default_playlist   = ''                # Plex playlist ratingKey; dashboard can scan playlists
 shuffle            = true              # true or false
 
 [external_audio]

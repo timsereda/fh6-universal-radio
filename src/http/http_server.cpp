@@ -564,6 +564,27 @@ struct HttpServer::Impl {
             return lf ? ok(json{{"tracks", lf->playlist_snapshot()}})
                       : fail(404, "local_files not registered");
         }
+        if (m == "GET" && p == "/api/source/plex/playlists") {
+            const auto snap = store.snapshot();
+            if (snap.plex.server_url.empty() || snap.plex.token.empty())
+                return fail(400, "plex server_url and token required");
+            auto fetched = sources::PlexSource::list_playlists(snap.plex);
+            if (!fetched) return fail(502, "plex playlist scan failed");
+            json playlists = json::array();
+            for (const auto& playlist : *fetched) {
+                playlists.push_back(json{
+                    {"id", playlist.id},
+                    {"key", playlist.key},
+                    {"title", playlist.title},
+                    {"playlist_type", playlist.playlist_type},
+                    {"duration_ms", playlist.duration_ms},
+                    {"leaf_count", playlist.leaf_count},
+                    {"smart", playlist.smart},
+                });
+            }
+            return ok(json{{"playlists", playlists},
+                           {"default_playlist", snap.plex.default_playlist}});
+        }
 
         if (m == "PUT" && p == "/api/config") {
             auto patch = json::parse(req.body);

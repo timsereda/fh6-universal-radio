@@ -77,10 +77,11 @@ From there:
     under Settings > Jellyfin. Jellyfin transcodes to PCM via
     ffmpeg.
 
-  * Plex: stream music playlists from your own Plex server.
-    Configure the server URL, token, and playlist ratingKey under
-    Settings > Plex. Plex playback routes through ffmpeg, so the
-    configured ffmpeg path must be valid.
+  * Plex: scan and stream music playlists from your own Plex server.
+    Configure the server URL and token under Settings > Plex, then use
+    Play Plex Playlist > Scan to pick a playlist ratingKey. Plex playback
+    routes through ffmpeg and reports a Plex playback timeline as FH6
+    Universal Radio, so the configured ffmpeg path must be valid.
 
   * External audio: capture any Windows playback device and pipe a
     live app (Deezer, a browser tab...) into the radio. The capture

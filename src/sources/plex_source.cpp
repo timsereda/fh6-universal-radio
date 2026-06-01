@@ -16,6 +16,7 @@
 #include <random>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -37,6 +38,10 @@ constexpr std::uint64_t kPcmBytesPerSec = 48000ull * 2ull * 2ull;
 // 5 s ceilings on every WinHTTP phase so an unreachable server cannot stall
 // the bridge thread (or a settings PATCH handler) for the default 60 seconds.
 constexpr int kHttpTimeoutMs = 5000;
+constexpr std::uint64_t kTimelineIntervalMs = 10'000;
+constexpr std::string_view kPlexClientId = "fh6-universal-radio";
+constexpr std::string_view kPlexProduct = "FH6 Universal Radio";
+constexpr std::string_view kPlexVersion = "1.0";
 
 struct WinHttpDeleter {
     void operator()(void* h) const noexcept { if (h) WinHttpCloseHandle(h); }
@@ -90,7 +95,16 @@ std::optional<std::string> http_get(const PlexConfig& cfg, const std::string& pa
     if (!req) return std::nullopt;
 
     const std::wstring headers = widen(std::format(
-        "X-Plex-Token: {}\r\nAccept: application/json\r\n", cfg.token));
+        "X-Plex-Token: {}\r\n"
+        "X-Plex-Client-Identifier: {}\r\n"
+        "X-Plex-Product: {}\r\n"
+        "X-Plex-Version: {}\r\n"
+        "X-Plex-Device: PC\r\n"
+        "X-Plex-Device-Name: FH6 Universal Radio\r\n"
+        "X-Plex-Platform: Windows\r\n"
+        "X-Plex-Provides: player\r\n"
+        "Accept: application/json\r\n",
+        cfg.token, kPlexClientId, kPlexProduct, kPlexVersion));
     WinHttpAddRequestHeaders(req.get(), headers.c_str(), (ULONG)-1L, WINHTTP_ADDREQ_FLAG_ADD);
 
     if (!WinHttpSendRequest(req.get(), WINHTTP_NO_ADDITIONAL_HEADERS, 0,
@@ -121,6 +135,101 @@ std::optional<std::string> http_get(const PlexConfig& cfg, const std::string& pa
         return std::nullopt;
     }
     return body;
+}
+
+std::string url_encode(std::string_view s) {
+    static constexpr char hex[] = "0123456789ABCDEF";
+    std::string out;
+    out.reserve(s.size());
+    for (const unsigned char c : s) {
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+            (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') {
+            out.push_back(static_cast<char>(c));
+        } else {
+            out.push_back('%');
+            out.push_back(hex[c >> 4]);
+            out.push_back(hex[c & 0x0F]);
+        }
+    }
+    return out;
+}
+
+std::string metadata_path_for(const PlexTrack& track) {
+    if (!track.metadata_path.empty()) return track.metadata_path;
+    return std::format("/library/metadata/{}", track.id);
+}
+
+void report_timeline_async(PlexConfig cfg, PlexTrack track, std::string state,
+                           std::uint64_t position_ms, bool continuing) {
+    if (!config_complete(cfg) || track.id.empty()) return;
+    std::thread([cfg = std::move(cfg), track = std::move(track), state = std::move(state),
+                 position_ms, continuing] {
+        const auto key = metadata_path_for(track);
+        std::string path = std::format(
+            "/:/timeline?ratingKey={}&key={}&identifier=com.plexapp.plugins.library"
+            "&state={}&time={}&duration={}&hasMDE=1&type=music",
+            url_encode(track.id), url_encode(key), url_encode(state),
+            position_ms, track.duration_ms);
+        if (state == "stopped")
+            path += continuing ? "&continuing=1" : "&continuing=0";
+        (void)http_get(cfg, path);
+    }).detach();
+}
+
+std::uint64_t json_u64(const nlohmann::json& item, const char* key) {
+    if (auto it = item.find(key); it != item.end() && !it->is_null()) {
+        if (it->is_number_unsigned()) return it->get<std::uint64_t>();
+        if (it->is_number_integer()) {
+            const auto v = it->get<std::int64_t>();
+            return v > 0 ? static_cast<std::uint64_t>(v) : 0;
+        }
+    }
+    return 0;
+}
+
+bool json_boolish(const nlohmann::json& item, const char* key) {
+    if (auto it = item.find(key); it != item.end() && !it->is_null()) {
+        if (it->is_boolean()) return it->get<bool>();
+        if (it->is_number_integer()) return it->get<int>() != 0;
+    }
+    return false;
+}
+
+std::optional<std::vector<PlexPlaylist>> fetch_playlists(const PlexConfig& cfg) {
+    PlexConfig snap = cfg;
+    if (snap.default_playlist.empty()) snap.default_playlist = "0";
+    if (snap.server_url.empty() || snap.token.empty()) return std::nullopt;
+
+    auto body = http_get(snap, "/playlists?playlistType=audio");
+    if (!body) return std::nullopt;
+
+    std::vector<PlexPlaylist> out;
+    try {
+        const auto root = nlohmann::json::parse(*body);
+        auto container = root.find("MediaContainer");
+        if (container == root.end() || !container->is_object()) return std::nullopt;
+        const auto items = container->find("Metadata");
+        if (items == container->end() || !items->is_array()) return std::nullopt;
+
+        out.reserve(items->size());
+        for (const auto& item : *items) {
+            PlexPlaylist playlist;
+            playlist.id = item.value("ratingKey", "");
+            playlist.key = item.value("key", "");
+            playlist.title = item.value("title", "Untitled Playlist");
+            playlist.playlist_type = item.value("playlistType", "");
+            playlist.duration_ms = json_u64(item, "duration");
+            playlist.leaf_count = json_u64(item, "leafCount");
+            playlist.smart = json_boolish(item, "smart");
+            if (playlist.id.empty()) continue;
+            if (!playlist.playlist_type.empty() && playlist.playlist_type != "audio") continue;
+            out.push_back(std::move(playlist));
+        }
+    } catch (const std::exception& e) {
+        log::error("[plex] playlist JSON parse error: {}", e.what());
+        return std::nullopt;
+    }
+    return out;
 }
 
 std::optional<std::vector<PlexTrack>> fetch_tracks(const PlexConfig& cfg) {
@@ -154,6 +263,7 @@ std::optional<std::vector<PlexTrack>> fetch_tracks(const PlexConfig& cfg) {
             PlexTrack t;
             t.id = item.value("ratingKey", "");
             if (t.id.empty()) continue;
+            t.metadata_path = item.value("key", "");
             t.title = item.value("title", "Unknown Track");
             if (auto a = item.find("grandparentTitle"); a != item.end() && a->is_string())
                 t.artist = a->get<std::string>();
@@ -170,7 +280,7 @@ std::optional<std::vector<PlexTrack>> fetch_tracks(const PlexConfig& cfg) {
                     t.stream_path = parts->front().value("key", "");
                 }
             }
-            if (t.stream_path.empty()) t.stream_path = item.value("key", "");
+            if (t.stream_path.empty()) t.stream_path = t.metadata_path;
             if (t.stream_path.empty()) continue;
             out.push_back(std::move(t));
         }
@@ -217,6 +327,7 @@ struct PlexSource::Pipe {
     HANDLE read_pipe = nullptr;
     std::uint64_t bytes_written = 0;
     std::atomic<std::uint64_t> position_ms{0};
+    std::uint64_t last_timeline_report_ms = 0;
     bool ended = false;
     std::size_t for_queue_idx = 0;
 
@@ -255,6 +366,9 @@ bool PlexSource::initialize() {
 void PlexSource::shutdown() noexcept {
     std::scoped_lock lk{mu_};
     discard_prefetch_locked();
+    if (pipe_ && !queue_.empty() && current_idx_ < queue_.size())
+        report_timeline_locked("stopped", current_idx_,
+                               pipe_->position_ms.load(std::memory_order_acquire));
     stop_pipe_locked();
 }
 
@@ -280,13 +394,25 @@ PlexSource::spawn_pipe_locked(std::size_t for_idx) {
 
     const std::wstring ff = ffmpeg_path_.empty() ? std::wstring{L"ffmpeg"}
                                                  : ffmpeg_path_.wstring();
+    // Keep the media fetch on Plex's file-download path. Direct part URLs
+    // without download=1 can be closed early by PMS/ffmpeg, which presents as
+    // random track advances in-game. Timeline calls below are what make Plex
+    // see this app as an active player/scrobble-capable client.
     const std::string stream_url =
         append_query_param(join_url(cfg_.server_url, queue_[for_idx].stream_path), "download=1");
     // Pass the Plex token via -headers so it isn't visible on the ffmpeg command
     // line to other local processes. \r\n is the canonical separator ffmpeg
     // expects between (and trailing) custom headers.
     const std::wstring auth_header = widen(std::format(
-        "X-Plex-Token: {}\r\n", cfg_.token));
+        "X-Plex-Token: {}\r\n"
+        "X-Plex-Client-Identifier: {}\r\n"
+        "X-Plex-Product: {}\r\n"
+        "X-Plex-Version: {}\r\n"
+        "X-Plex-Device: PC\r\n"
+        "X-Plex-Device-Name: FH6 Universal Radio\r\n"
+        "X-Plex-Platform: Windows\r\n"
+        "X-Plex-Provides: player\r\n",
+        cfg_.token, kPlexClientId, kPlexProduct, kPlexVersion));
 
     std::wstring cmd = quote(ff) +
         L" -loglevel error -headers " + quote(auth_header) +
@@ -352,6 +478,10 @@ void PlexSource::maybe_spawn_prefetch_locked() {
 
 void PlexSource::advance_locked(std::ptrdiff_t step) {
     if (queue_.empty()) return;
+    if (pipe_ && current_idx_ < queue_.size())
+        report_timeline_locked("stopped", current_idx_,
+                               pipe_->position_ms.load(std::memory_order_acquire),
+                               step > 0);
     const auto n = (std::ptrdiff_t)queue_.size();
     auto i = (std::ptrdiff_t)current_idx_ + step;
     current_idx_ = (std::size_t)(((i % n) + n) % n);
@@ -361,23 +491,37 @@ void PlexSource::advance_locked(std::ptrdiff_t step) {
         discard_prefetch_locked();   // backwards step invalidates the prefetch
         start_pipe_locked();
     }
-    if (pipe_) state_.store(PlaybackState::playing, std::memory_order_release);
+    if (pipe_) {
+        state_.store(PlaybackState::playing, std::memory_order_release);
+        report_timeline_locked("playing", current_idx_, 0);
+    }
 }
 
 void PlexSource::play() {
     std::scoped_lock lk{mu_};
     if (queue_.empty()) return;            // cast()/set_config() will populate
     if (!pipe_) start_pipe_locked();
-    if (pipe_) state_.store(PlaybackState::playing, std::memory_order_release);
+    if (pipe_) {
+        state_.store(PlaybackState::playing, std::memory_order_release);
+        report_timeline_locked("playing", current_idx_,
+                               pipe_->position_ms.load(std::memory_order_acquire));
+    }
 }
 
 void PlexSource::pause() {
     state_.store(PlaybackState::paused, std::memory_order_release);
+    std::scoped_lock lk{mu_};
+    if (pipe_ && current_idx_ < queue_.size())
+        report_timeline_locked("paused", current_idx_,
+                               pipe_->position_ms.load(std::memory_order_acquire));
 }
 
 void PlexSource::stop() {
     std::scoped_lock lk{mu_};
     discard_prefetch_locked();
+    if (pipe_ && current_idx_ < queue_.size())
+        report_timeline_locked("stopped", current_idx_,
+                               pipe_->position_ms.load(std::memory_order_acquire));
     stop_pipe_locked();
     current_idx_ = 0;
 }
@@ -412,7 +556,10 @@ bool PlexSource::cast(std::string playlist_id) {
     if (cfg_.shuffle) shuffle_range(queue_, 0);
     discard_prefetch_locked();   // stale: targets the old playlist
     start_pipe_locked();
-    if (pipe_) state_.store(PlaybackState::playing, std::memory_order_release);
+    if (pipe_) {
+        state_.store(PlaybackState::playing, std::memory_order_release);
+        report_timeline_locked("playing", current_idx_, 0);
+    }
     return true;
 }
 
@@ -444,7 +591,10 @@ void PlexSource::set_config(PlexConfig cfg) {
         if (cfg_.shuffle) shuffle_range(queue_, 0);
         if (was_playing) {
             start_pipe_locked();
-            if (pipe_) state_.store(PlaybackState::playing, std::memory_order_release);
+            if (pipe_) {
+                state_.store(PlaybackState::playing, std::memory_order_release);
+                report_timeline_locked("playing", current_idx_, 0);
+            }
         }
     } else if (shuffle_flip && cfg_.shuffle) {
         shuffle_range(queue_, current_idx_ + 1);   // preserve the currently-playing track
@@ -460,6 +610,18 @@ void PlexSource::set_ffmpeg_path(std::filesystem::path p) {
 bool PlexSource::shuffle() const noexcept {
     std::scoped_lock lk{mu_};
     return cfg_.shuffle;
+}
+
+std::optional<std::vector<PlexPlaylist>> PlexSource::list_playlists(const PlexConfig& cfg) {
+    std::scoped_lock fetch_lk{fetch_serializer()};
+    return fetch_playlists(cfg);
+}
+
+void PlexSource::report_timeline_locked(std::string_view state, std::size_t idx,
+                                        std::uint64_t position_ms,
+                                        bool continuing) const {
+    if (queue_.empty() || idx >= queue_.size()) return;
+    report_timeline_async(cfg_, queue_[idx], std::string{state}, position_ms, continuing);
 }
 
 void PlexSource::set_playback_options(const PlaybackConfig& opts) {
@@ -505,7 +667,12 @@ void PlexSource::pump(RingBuffer& ring) {
     auto update_position = [&] {
         const std::size_t r = ring.readable();
         const std::uint64_t played = p->bytes_written > r ? p->bytes_written - r : 0;
-        p->position_ms.store(played * 1000ull / kPcmBytesPerSec, std::memory_order_release);
+        const std::uint64_t position_ms = played * 1000ull / kPcmBytesPerSec;
+        p->position_ms.store(position_ms, std::memory_order_release);
+        if (position_ms >= p->last_timeline_report_ms + kTimelineIntervalMs) {
+            p->last_timeline_report_ms = position_ms;
+            report_timeline_locked("playing", current_idx_, position_ms);
+        }
     };
     auto on_eof = [&] {
         if (p->read_pipe) {
