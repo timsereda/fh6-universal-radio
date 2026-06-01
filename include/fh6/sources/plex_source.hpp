@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,11 +18,22 @@ namespace fh6::sources {
 
 struct PlexTrack {
     std::string id;
+    std::string metadata_path;
     std::string stream_path;
     std::string title;
     std::string artist;
     std::string album;
     std::uint64_t duration_ms = 0;
+};
+
+struct PlexPlaylist {
+    std::string id;
+    std::string key;
+    std::string title;
+    std::string playlist_type;
+    std::uint64_t duration_ms = 0;
+    std::uint64_t leaf_count = 0;
+    bool smart = false;
 };
 
 // Resolves a Plex playlist over HTTP, then streams each item through
@@ -56,6 +68,8 @@ public:
     // Returns false if the fetch fails (queue left untouched).
     bool cast(std::string playlist_id);
 
+    static std::optional<std::vector<PlexPlaylist>> list_playlists(const PlexConfig& cfg);
+
     void set_playback_options(const PlaybackConfig& opts) override;
 
     TrackInfo current_track() const override;
@@ -76,6 +90,8 @@ private:
     void maybe_spawn_prefetch_locked();
     std::size_t next_queue_idx_locked() const noexcept;
     void advance_locked(std::ptrdiff_t step);
+    void report_timeline_locked(std::string_view state, std::size_t idx,
+                                std::uint64_t position_ms, bool continuing = false) const;
 
     PlexConfig cfg_;
     std::filesystem::path ffmpeg_path_;

@@ -28,6 +28,7 @@ namespace fh6::http {
 //   POST /api/source/youtube_music/cast   body {"url":"..."}
 //   POST /api/source/jellyfin/cast        body {"playlist_id":"..."}
 //   POST /api/source/plex/cast            body {"playlist_id":"..."}
+//   GET  /api/source/plex/playlists       Plex audio playlists
 //
 //   POST /api/fs/browse                   body {"path":"..."}; "" => drive list
 //   GET  /api/source/local_files/stations stations + active_station + track_count

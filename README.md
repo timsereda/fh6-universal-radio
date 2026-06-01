@@ -20,7 +20,7 @@ An open-source radio mod for **Forza Horizon 6**. Adds a new in-game radio stati
 - **YouTube Music**: paste any video, playlist, or YT Music URL from the dashboard.
 - **Spotify Connect**: cast from the Spotify app to an "FH6 Universal Radio" device (requires Spotify Premium).
 - **Jellyfin**: stream playlists from your own Jellyfin server.
-- **Plex**: stream music playlists from your own Plex server.
+- **Plex**: scan and stream music playlists from your own Plex server, with Plex client playback timeline reporting.
 - **External audio**: capture any Windows app (Deezer, a browser tab...) and pipe it into the radio through a virtual audio cable; metadata and next/previous come from the Windows media session.
 - **In-game radio integration**: audio is routed through FH6's radio bus, fades with menus and reacts to in-game volume like every other station.
 - **Live dashboard** at `http://localhost:8420`: switch source, transport controls, volume, settings.
@@ -107,7 +107,7 @@ Requires **CMake** and **llvm-mingw**. On Arch: `sudo pacman -S llvm-mingw cmake
 | YouTube Music produces no audio | Check `%TEMP%\fh6-stderr.log` (helper-process stderr lands there). Usually expired cookies, or geo/format restrictions. |
 | Spotify device doesn't appear or won't play | Wait for `librespot` to finish downloading, confirm your phone/PC is on the same network, and that the account is Spotify Premium. |
 | Jellyfin cast returns "fetch failed" (502) | Check server URL, API key, and user ID under **Settings > Jellyfin**, that the playlist ID exists, and that the server is reachable from this machine. Jellyfin transcodes to PCM via `ffmpeg`, so the configured ffmpeg path must be valid. |
-| Plex cast returns "fetch failed" (502) | Check server URL and token under **Settings > Plex**, that the playlist ratingKey exists, and that the server is reachable from this machine. Plex playback streams through `ffmpeg`, so the configured ffmpeg path must be valid. |
+| Plex cast returns "fetch failed" (502) | Check server URL and token under **Settings > Plex**, that the playlist ratingKey exists or use **Play Plex Playlist > Scan**, and that the server is reachable from this machine. Plex playback streams through `ffmpeg`, so the configured ffmpeg path must be valid. |
 | External Audio plays in the background, not through the radio | You're capturing the same device the app plays on. Route the app's output to a **virtual audio cable** and select that cable as the **Capture device** (see [External audio](#external-audio)). |
 | External Audio has clicks / artifacts | Set the virtual cable to **48000 Hz** (2 ch). Other sample rates caused artifacts in testing. |
 
