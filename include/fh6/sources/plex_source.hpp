@@ -4,6 +4,7 @@
 #include "fh6/config.hpp"
 #include "fh6/playback_dsp.hpp"
 #include "fh6/ring_buffer.hpp"
+#include "fh6/worker/worker_client.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -42,7 +43,8 @@ struct PlexPlaylist {
 // freeze the AudioSourceManager pump loop.
 class PlexSource final : public IAudioSource {
 public:
-    PlexSource(PlexConfig cfg, std::filesystem::path ffmpeg_path);
+    PlexSource(PlexConfig cfg, std::filesystem::path ffmpeg_path,
+               worker::WorkerClient* worker = nullptr);
     ~PlexSource() override;
 
     std::string_view name() const noexcept override         { return "plex"; }
@@ -95,6 +97,7 @@ private:
 
     PlexConfig cfg_;
     std::filesystem::path ffmpeg_path_;
+    worker::WorkerClient* worker_;
 
     mutable std::mutex mu_;
     std::vector<PlexTrack> queue_;

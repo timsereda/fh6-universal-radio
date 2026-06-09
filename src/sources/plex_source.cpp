@@ -322,6 +322,9 @@ std::string append_query_param(std::string url, std::string_view param) {
 } // namespace
 
 struct PlexSource::Pipe {
+    worker::WorkerClient* worker = nullptr;
+    uint32_t pipeline_id = 0;
+
     HANDLE job       = nullptr;
     HANDLE proc      = nullptr;
     HANDLE read_pipe = nullptr;
@@ -332,17 +335,19 @@ struct PlexSource::Pipe {
     std::size_t for_queue_idx = 0;
 
     ~Pipe() {
-        // Close the read side first so ffmpeg's next write returns
-        // ERROR_BROKEN_PIPE; dropping the job handle then reaps it via
-        // JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE.
-        if (read_pipe) CloseHandle(read_pipe);
-        if (job)       CloseHandle(job);
-        if (proc)      CloseHandle(proc);
+        if (read_pipe) {
+            CloseHandle(read_pipe);
+            read_pipe = nullptr;
+        }
+        if (worker && pipeline_id) worker->kill_pipeline(pipeline_id);
+        subprocess::reap(proc);
+        if (job) CloseHandle(job);
     }
 };
 
-PlexSource::PlexSource(PlexConfig cfg, std::filesystem::path ffmpeg_path)
-    : cfg_{std::move(cfg)}, ffmpeg_path_{std::move(ffmpeg_path)} {}
+PlexSource::PlexSource(PlexConfig cfg, std::filesystem::path ffmpeg_path,
+                       worker::WorkerClient* worker)
+    : cfg_{std::move(cfg)}, ffmpeg_path_{std::move(ffmpeg_path)}, worker_{worker} {}
 
 PlexSource::~PlexSource() {
     std::scoped_lock lk{mu_};
@@ -378,19 +383,6 @@ PlexSource::spawn_pipe_locked(std::size_t for_idx) {
 
     auto pipe = std::make_unique<Pipe>();
     pipe->for_queue_idx = for_idx;
-    pipe->job = create_kill_on_close_job();
-    if (!pipe->job) {
-        log::warn("[plex] CreateJobObject failed ({})", GetLastError());
-        return nullptr;
-    }
-
-    SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
-    HANDLE out_r = nullptr, out_w = nullptr;
-    if (!CreatePipe(&out_r, &out_w, &sa, 1 << 20)) return nullptr;
-    SetHandleInformation(out_r, HANDLE_FLAG_INHERIT, 0);
-
-    HANDLE nul_in  = open_nul(GENERIC_READ);
-    HANDLE err_log = open_stderr_log();
 
     const std::wstring ff = ffmpeg_path_.empty() ? std::wstring{L"ffmpeg"}
                                                  : ffmpeg_path_.wstring();
@@ -420,6 +412,31 @@ PlexSource::spawn_pipe_locked(std::size_t for_idx) {
     if (volume_norm_.load(std::memory_order_acquire))
         cmd += L"-af loudnorm=I=-14:TP=-2:LRA=11 ";
     cmd += L"-acodec pcm_s16le -ar 48000 -ac 2 pipe:1";
+
+    if (worker_ && worker_->alive()) {
+        if (auto result = worker_->spawn_single(cmd); result.ok) {
+            pipe->worker      = worker_;
+            pipe->pipeline_id = result.pipeline_id;
+            pipe->read_pipe   = result.pcm_pipe;
+            return pipe;
+        }
+        log::warn("[plex] worker spawn failed for {} -- falling back to direct spawn",
+                  queue_[for_idx].id);
+    }
+
+    pipe->job = create_kill_on_close_job();
+    if (!pipe->job) {
+        log::warn("[plex] CreateJobObject failed ({})", GetLastError());
+        return nullptr;
+    }
+
+    SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
+    HANDLE out_r = nullptr, out_w = nullptr;
+    if (!CreatePipe(&out_r, &out_w, &sa, 1 << 20)) return nullptr;
+    SetHandleInformation(out_r, HANDLE_FLAG_INHERIT, 0);
+
+    HANDLE nul_in  = open_nul(GENERIC_READ);
+    HANDLE err_log = open_stderr_log();
 
     pipe->proc = spawn_in_job(pipe->job, cmd, nul_in, out_w, err_log);
     const DWORD ec = pipe->proc ? 0u : GetLastError();

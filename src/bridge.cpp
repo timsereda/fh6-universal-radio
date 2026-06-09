@@ -200,7 +200,8 @@ void run_bridge(HMODULE self) noexcept {
             mgr.unregister_source("online_radio");
         }
         if (c.plex.enabled && !mgr.find("plex")) {
-            auto src = std::make_unique<sources::PlexSource>(c.plex, c.general.ffmpeg_path);
+            auto src =
+                std::make_unique<sources::PlexSource>(c.plex, c.general.ffmpeg_path, &worker);
             if (src->initialize()) mgr.register_source(std::move(src));
         } else if (!c.plex.enabled && mgr.find("plex")) {
             mgr.unregister_source("plex");
